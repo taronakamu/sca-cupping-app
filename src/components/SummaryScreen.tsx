@@ -39,18 +39,26 @@ import { Textarea } from "./ui/textarea";
 
 interface CupScore {
   cupTitle: string;
+  roastLevel: number;
   fragrance: number;
+  aromaDryIntensity: number;
+  aromaBreakIntensity: number;
+  aromaQualities: string;
   flavor: number;
+  flavorNotes: string;
   aftertaste: number;
+  aftertasteNotes: string;
   acidity: number;
+  acidityIntensity: number;
   body: number;
+  bodyLevel: number;
   balance: number;
+  uniformityIssues: boolean[];
+  cleanCupIssues: boolean[];
+  sweetnessIssues: boolean[];
   overall: number;
-  uniformity: number;
-  cleanCup: number;
-  sweetness: number;
-  defectType: string;
-  defectCount: number;
+  taintCups: number;
+  faultCups: number;
   notes: string;
 }
 
@@ -110,6 +118,11 @@ export function SummaryScreen({
   };
 
   const calculateTotal = (cup: CupScore): number => {
+    // Calculate scores from issue arrays
+    const uniformityScore = 10 - (cup.uniformityIssues.filter(x => x).length * 2);
+    const cleanCupScore = 10 - (cup.cleanCupIssues.filter(x => x).length * 2);
+    const sweetnessScore = 10 - (cup.sweetnessIssues.filter(x => x).length * 2);
+
     const scoreSum =
       cup.fragrance +
       cup.flavor +
@@ -118,18 +131,17 @@ export function SummaryScreen({
       cup.body +
       cup.balance +
       cup.overall +
-      cup.uniformity +
-      cup.cleanCup +
-      cup.sweetness;
+      uniformityScore +
+      cleanCupScore +
+      sweetnessScore;
 
-    const defectDeduction =
-      cup.defectType === "taint"
-        ? cup.defectCount * 2
-        : cup.defectType === "fault"
-        ? cup.defectCount * 4
-        : 0;
+    const defectDeduction = cup.taintCups * 2 + cup.faultCups * 4;
 
     return Number((scoreSum - defectDeduction).toFixed(2));
+  };
+
+  const getLevelLabel = (value: number, labels: string[]): string => {
+    return labels[value - 1] || "";
   };
 
   const exportJSON = () => {
@@ -149,42 +161,62 @@ export function SummaryScreen({
   const exportCSV = () => {
     const headers = [
       "Cup",
+      "Roast Level",
       "Fragrance/Aroma",
+      "Aroma Dry Intensity",
+      "Aroma Break Intensity",
+      "Aroma Qualities",
       "Flavor",
+      "Flavor Notes",
       "Aftertaste",
+      "Aftertaste Notes",
       "Acidity",
+      "Acidity Intensity",
       "Body",
+      "Body Level",
       "Balance",
-      "Overall",
       "Uniformity",
       "Clean Cup",
       "Sweetness",
-      "Defects",
+      "Overall",
+      "Taint Cups",
+      "Fault Cups",
+      "Defect Deduction",
       "Total",
+      "Notes",
     ];
 
     const rows = session.cupScores.map((cup, index) => {
-      const defectDeduction =
-        cup.defectType === "taint"
-          ? cup.defectCount * 2
-          : cup.defectType === "fault"
-          ? cup.defectCount * 4
-          : 0;
+      const defectDeduction = cup.taintCups * 2 + cup.faultCups * 4;
+      const uniformityScore = 10 - (cup.uniformityIssues.filter(x => x).length * 2);
+      const cleanCupScore = 10 - (cup.cleanCupIssues.filter(x => x).length * 2);
+      const sweetnessScore = 10 - (cup.sweetnessIssues.filter(x => x).length * 2);
 
       return [
-        cup.cupTitle || `Cup #${index + 1}`,
+        `"${cup.cupTitle || `Cup #${index + 1}`}"`,
+        cup.roastLevel,
         cup.fragrance,
+        cup.aromaDryIntensity,
+        cup.aromaBreakIntensity,
+        `"${cup.aromaQualities || ""}"`,
         cup.flavor,
+        `"${cup.flavorNotes || ""}"`,
         cup.aftertaste,
+        `"${cup.aftertasteNotes || ""}"`,
         cup.acidity,
+        cup.acidityIntensity,
         cup.body,
+        cup.bodyLevel,
         cup.balance,
+        uniformityScore,
+        cleanCupScore,
+        sweetnessScore,
         cup.overall,
-        cup.uniformity,
-        cup.cleanCup,
-        cup.sweetness,
+        cup.taintCups,
+        cup.faultCups,
         `-${defectDeduction}`,
         calculateTotal(cup),
+        `"${(cup.notes || "").replace(/"/g, '""')}"`, // Escape double quotes in notes
       ];
     });
 
@@ -193,17 +225,29 @@ export function SummaryScreen({
       "\n" +
       rows.map((row) => row.join(",")).join("\n");
 
-    const dataUri =
-      "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
+    // Add BOM for UTF-8 to prevent character encoding issues on Windows
+    const BOM = "\uFEFF";
+    const csvWithBOM = BOM + csvContent;
+
+    // Create a Blob with UTF-8 encoding
+    const blob = new Blob([csvWithBOM], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const exportFileDefaultName = `cupping-${session.id}.csv`;
 
     const linkElement = document.createElement("a");
-    linkElement.setAttribute("href", dataUri);
+    linkElement.setAttribute("href", url);
     linkElement.setAttribute("download", exportFileDefaultName);
     linkElement.click();
+    
+    // Clean up the URL object
+    URL.revokeObjectURL(url);
 
     toast.success("CSV exported successfully");
   };
+
+  const intensityLabels = ["Very Low", "Low", "Medium", "High", "Very High"];
+  const bodyLabels = ["Very Light", "Light", "Medium", "Heavy", "Very Heavy"];
+  const roastLabels = ["Light", "Med-Light", "Medium", "Med-Dark", "Dark"];
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#121212] p-4 pb-20">
@@ -247,7 +291,7 @@ export function SummaryScreen({
                   e.preventDefault();
                   setDeleteDialogOpen(true);
                 }}
-                className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                className="cursor-pointer"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete Session
@@ -291,123 +335,191 @@ export function SummaryScreen({
                           {cup.cupTitle || `Cup #${index + 1}`}
                         </h3>
                       </div>
-                      <div className="text-2xl text-[#2C2C2C] dark:text-[#E5E5E5]">
+                      <div className="text-2xl text-[#1a1a1a] dark:text-[#E5E5E5] tabular-nums">
                         {calculateTotal(cup)}
                       </div>
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="px-5 pb-5 space-y-4 border-t">
-                      <div className="pt-4">
-                        <h3 className="text-xs uppercase tracking-wide text-[#666] dark:text-[#999] mb-3">
-                          Core Attributes
+                    <div className="px-5 pb-5 space-y-5 border-t pt-5">
+                      {/* Roast Level */}
+                      <div>
+                        <h3 className="text-xs uppercase tracking-wide text-[#666] dark:text-[#999] mb-2">
+                          Roast Level
                         </h3>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <div className="text-sm text-[#666] dark:text-[#aaa]">
-                              Fragrance/Aroma
-                            </div>
-                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                              {cup.fragrance.toFixed(2)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-[#666] dark:text-[#aaa]">
-                              Flavor
-                            </div>
-                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                              {cup.flavor.toFixed(2)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-[#666] dark:text-[#aaa]">
-                              Aftertaste
-                            </div>
-                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                              {cup.aftertaste.toFixed(2)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-[#666] dark:text-[#aaa]">
-                              Acidity
-                            </div>
-                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                              {cup.acidity.toFixed(2)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-[#666] dark:text-[#aaa]">
-                              Body
-                            </div>
-                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                              {cup.body.toFixed(2)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-[#666] dark:text-[#aaa]">
-                              Balance
-                            </div>
-                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                              {cup.balance.toFixed(2)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-sm text-[#666] dark:text-[#aaa]">
-                              Overall
-                            </div>
-                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                              {cup.overall.toFixed(2)}
-                            </div>
-                          </div>
+                        <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
+                          {roastLabels[cup.roastLevel - 1]} ({cup.roastLevel}/5)
                         </div>
                       </div>
 
+                      {/* Fragrance/Aroma */}
                       <div>
                         <h3 className="text-xs uppercase tracking-wide text-[#666] dark:text-[#999] mb-3">
-                          Consistency & Defects
+                          Fragrance / Aroma
                         </h3>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <div className="text-sm text-[#666] dark:text-[#aaa]">
-                              Uniformity
-                            </div>
-                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                              {cup.uniformity}/10
-                            </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-[#666] dark:text-[#aaa]">Score</span>
+                            <span className="text-[#1a1a1a] dark:text-[#f5f5f5] tabular-nums">
+                              {cup.fragrance.toFixed(2)}
+                            </span>
                           </div>
-                          <div>
-                            <div className="text-sm text-[#666] dark:text-[#aaa]">
-                              Clean Cup
-                            </div>
-                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                              {cup.cleanCup}/10
-                            </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-[#666] dark:text-[#aaa]">Dry Intensity</span>
+                            <span className="text-[#1a1a1a] dark:text-[#f5f5f5]">
+                              {getLevelLabel(cup.aromaDryIntensity, intensityLabels)} ({cup.aromaDryIntensity}/5)
+                            </span>
                           </div>
-                          <div>
-                            <div className="text-sm text-[#666] dark:text-[#aaa]">
-                              Sweetness
-                            </div>
-                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                              {cup.sweetness}/10
-                            </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-[#666] dark:text-[#aaa]">Break Intensity</span>
+                            <span className="text-[#1a1a1a] dark:text-[#f5f5f5]">
+                              {getLevelLabel(cup.aromaBreakIntensity, intensityLabels)} ({cup.aromaBreakIntensity}/5)
+                            </span>
                           </div>
-                          {cup.defectCount > 0 && (
-                            <div>
-                              <div className="text-sm text-[#666] dark:text-[#aaa]">
-                                Defects
-                              </div>
-                              <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
-                                {cup.defectType} ({cup.defectCount})
+                          {cup.aromaQualities && (
+                            <div className="pt-1">
+                              <div className="text-xs text-[#666] dark:text-[#aaa]">Qualities</div>
+                              <div className="text-sm text-[#1a1a1a] dark:text-[#f5f5f5] italic">
+                                {cup.aromaQualities}
                               </div>
                             </div>
                           )}
                         </div>
                       </div>
 
+                      {/* Taste Attributes */}
+                      <div>
+                        <h3 className="text-xs uppercase tracking-wide text-[#666] dark:text-[#999] mb-3">
+                          Taste
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-sm text-[#666] dark:text-[#aaa]">Flavor</div>
+                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5] tabular-nums">
+                              {cup.flavor.toFixed(2)}
+                            </div>
+                            {cup.flavorNotes && (
+                              <div className="text-xs text-[#666] dark:text-[#aaa] italic mt-0.5">
+                                {cup.flavorNotes}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-sm text-[#666] dark:text-[#aaa]">Aftertaste</div>
+                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5] tabular-nums">
+                              {cup.aftertaste.toFixed(2)}
+                            </div>
+                            {cup.aftertasteNotes && (
+                              <div className="text-xs text-[#666] dark:text-[#aaa] italic mt-0.5">
+                                {cup.aftertasteNotes}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Structure */}
+                      <div>
+                        <h3 className="text-xs uppercase tracking-wide text-[#666] dark:text-[#999] mb-3">
+                          Structure
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-sm text-[#666] dark:text-[#aaa]">Acidity</div>
+                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5] tabular-nums">
+                              {cup.acidity.toFixed(2)}
+                            </div>
+                            <div className="text-xs text-[#666] dark:text-[#aaa] mt-0.5">
+                              Intensity: {getLevelLabel(cup.acidityIntensity, intensityLabels)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-[#666] dark:text-[#aaa]">Body</div>
+                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5] tabular-nums">
+                              {cup.body.toFixed(2)}
+                            </div>
+                            <div className="text-xs text-[#666] dark:text-[#aaa] mt-0.5">
+                              Level: {getLevelLabel(cup.bodyLevel, bodyLabels)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-[#666] dark:text-[#aaa]">Balance</div>
+                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5] tabular-nums">
+                              {cup.balance.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Consistency */}
+                      <div>
+                        <h3 className="text-xs uppercase tracking-wide text-[#666] dark:text-[#999] mb-3">
+                          Consistency
+                        </h3>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <div className="text-sm text-[#666] dark:text-[#aaa]">Uniformity</div>
+                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
+                              {10 - (cup.uniformityIssues.filter(x => x).length * 2)}/10
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-[#666] dark:text-[#aaa]">Clean Cup</div>
+                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
+                              {10 - (cup.cleanCupIssues.filter(x => x).length * 2)}/10
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-[#666] dark:text-[#aaa]">Sweetness</div>
+                            <div className="text-[#1a1a1a] dark:text-[#f5f5f5]">
+                              {10 - (cup.sweetnessIssues.filter(x => x).length * 2)}/10
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Overall */}
+                      <div>
+                        <h3 className="text-xs uppercase tracking-wide text-[#666] dark:text-[#999] mb-3">
+                          Overall
+                        </h3>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-[#666] dark:text-[#aaa]">Score</span>
+                          <span className="text-[#1a1a1a] dark:text-[#f5f5f5] tabular-nums">
+                            {cup.overall.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Defects */}
+                      {(cup.taintCups > 0 || cup.faultCups > 0) && (
+                        <div>
+                          <h3 className="text-xs uppercase tracking-wide text-[#666] dark:text-[#999] mb-3">
+                            Defects
+                          </h3>
+                          <div className="space-y-1">
+                            {cup.taintCups > 0 && (
+                              <div className="text-sm text-[#1a1a1a] dark:text-[#f5f5f5]">
+                                Taint: {cup.taintCups} cups (−{cup.taintCups * 2} pts)
+                              </div>
+                            )}
+                            {cup.faultCups > 0 && (
+                              <div className="text-sm text-[#1a1a1a] dark:text-[#f5f5f5]">
+                                Fault: {cup.faultCups} cups (−{cup.faultCups * 4} pts)
+                              </div>
+                            )}
+                            <div className="text-sm text-[#666] dark:text-[#999] pt-1">
+                              Total Deduction: −{cup.taintCups * 2 + cup.faultCups * 4} points
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Notes */}
                       {cup.notes && (
                         <div className="pt-3 border-t">
                           <div className="text-sm text-[#666] dark:text-[#aaa] mb-1">
-                            Notes
+                            Additional Notes
                           </div>
                           <div className="text-sm text-[#1a1a1a] dark:text-[#f5f5f5] whitespace-pre-wrap">
                             {cup.notes}
@@ -442,7 +554,7 @@ export function SummaryScreen({
           </Button>
           <Button
             onClick={onBack}
-            className="w-full h-12 rounded-xl bg-[#2C2C2C] hover:bg-[#1a1a1a] min-h-[44px]"
+            className="w-full h-12 rounded-xl bg-[#1a1a1a] hover:bg-[#000] dark:bg-[#f5f5f5] dark:text-[#1a1a1a] dark:hover:bg-white min-h-[44px]"
           >
             Back to Home
           </Button>
@@ -463,7 +575,7 @@ export function SummaryScreen({
             <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
-              className="rounded-xl bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+              className="rounded-xl bg-[#1a1a1a] hover:bg-[#000] dark:bg-[#f5f5f5] dark:text-[#1a1a1a] dark:hover:bg-white"
             >
               Delete
             </AlertDialogAction>
@@ -533,7 +645,7 @@ export function SummaryScreen({
               </Button>
               <Button
                 onClick={handleEditSave}
-                className="flex-1 h-12 rounded-xl bg-[#2C2C2C] hover:bg-[#1a1a1a]"
+                className="flex-1 h-12 rounded-xl bg-[#1a1a1a] hover:bg-[#000] dark:bg-[#f5f5f5] dark:text-[#1a1a1a] dark:hover:bg-white"
               >
                 Save Changes
               </Button>

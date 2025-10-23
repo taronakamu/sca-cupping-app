@@ -9,18 +9,32 @@ type Screen = "home" | "new-session" | "cupping" | "summary";
 
 interface CupScore {
   cupTitle: string;
-  fragrance: number;
+  roastLevel: number; // 1-5 (Light to Dark)
+  // Fragrance/Aroma (first evaluation)
+  fragrance: number; // 0.00-10.00
+  aromaDryIntensity: number; // 1-5
+  aromaBreakIntensity: number; // 1-5
+  aromaQualities: string; // Combined dry + break
+  // Taste attributes
   flavor: number;
+  flavorNotes: string;
   aftertaste: number;
+  aftertasteNotes: string;
   acidity: number;
+  acidityIntensity: number; // 1-5
   body: number;
+  bodyLevel: number; // 1-5
   balance: number;
+  // Consistency (mark problematic cups individually)
+  uniformityIssues: boolean[]; // 5 cups
+  cleanCupIssues: boolean[]; // 5 cups
+  sweetnessIssues: boolean[]; // 5 cups
+  // Final impression
   overall: number;
-  uniformity: number;
-  cleanCup: number;
-  sweetness: number;
-  defectType: string;
-  defectCount: number;
+  // Defects
+  taintCups: number;
+  faultCups: number;
+  // General notes
   notes: string;
 }
 
@@ -46,7 +60,64 @@ function App() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        setSessions(JSON.parse(stored));
+        const parsedSessions = JSON.parse(stored);
+        // Migrate old sessions to new format
+        const migratedSessions = parsedSessions.map((session: Session) => ({
+          ...session,
+          cupScores: session.cupScores.map((cup: any) => {
+            // If old format, migrate to new format
+            if ('defectType' in cup && !('taintCups' in cup)) {
+              const taintCups = cup.defectType === 'taint' ? (cup.defectCount || 0) : 0;
+              const faultCups = cup.defectType === 'fault' ? (cup.defectCount || 0) : 0;
+              
+              // Migrate old uniformity/cleanCup/sweetness scores to issue arrays
+              const uniformityIssues = cup.uniformity ? 
+                Array(5).fill(false).map((_, i) => i < (5 - Math.floor(cup.uniformity / 2))) : 
+                [false, false, false, false, false];
+              const cleanCupIssues = cup.cleanCup ? 
+                Array(5).fill(false).map((_, i) => i < (5 - Math.floor(cup.cleanCup / 2))) : 
+                [false, false, false, false, false];
+              const sweetnessIssues = cup.sweetness ? 
+                Array(5).fill(false).map((_, i) => i < (5 - Math.floor(cup.sweetness / 2))) : 
+                [false, false, false, false, false];
+              
+              return {
+                ...cup,
+                roastLevel: cup.roastLevel ?? 3,
+                aromaDryIntensity: cup.aromaDryIntensity ?? 3,
+                aromaBreakIntensity: cup.aromaBreakIntensity ?? 3,
+                aromaQualities: cup.aromaDryQualities || cup.aromaBreakQualities || "",
+                flavorNotes: "",
+                aftertasteNotes: "",
+                acidityIntensity: cup.acidityIntensity ?? 3,
+                bodyLevel: cup.bodyLevel ?? 3,
+                uniformityIssues,
+                cleanCupIssues,
+                sweetnessIssues,
+                taintCups,
+                faultCups,
+              };
+            }
+            // Already new format, but ensure all fields exist
+            return {
+              roastLevel: 3,
+              aromaDryIntensity: 3,
+              aromaBreakIntensity: 3,
+              aromaQualities: "",
+              flavorNotes: "",
+              aftertasteNotes: "",
+              acidityIntensity: 3,
+              bodyLevel: 3,
+              uniformityIssues: [false, false, false, false, false],
+              cleanCupIssues: [false, false, false, false, false],
+              sweetnessIssues: [false, false, false, false, false],
+              taintCups: 0,
+              faultCups: 0,
+              ...cup,
+            };
+          }),
+        }));
+        setSessions(migratedSessions);
       } catch (e) {
         console.error("Failed to parse sessions from localStorage", e);
       }
@@ -60,18 +131,32 @@ function App() {
 
   const createDefaultCupScore = (): CupScore => ({
     cupTitle: "",
+    roastLevel: 3, // Medium by default
+    // Fragrance/Aroma
     fragrance: 6.0,
+    aromaDryIntensity: 3,
+    aromaBreakIntensity: 3,
+    aromaQualities: "",
+    // Taste attributes
     flavor: 6.0,
+    flavorNotes: "",
     aftertaste: 6.0,
+    aftertasteNotes: "",
     acidity: 6.0,
+    acidityIntensity: 3,
     body: 6.0,
+    bodyLevel: 3,
     balance: 6.0,
+    // Consistency (no issues by default)
+    uniformityIssues: [false, false, false, false, false],
+    cleanCupIssues: [false, false, false, false, false],
+    sweetnessIssues: [false, false, false, false, false],
+    // Final impression
     overall: 6.0,
-    uniformity: 10,
-    cleanCup: 10,
-    sweetness: 10,
-    defectType: "none",
-    defectCount: 0,
+    // Defects
+    taintCups: 0,
+    faultCups: 0,
+    // General notes
     notes: "",
   });
 
