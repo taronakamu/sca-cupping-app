@@ -64,6 +64,7 @@ export function HomeScreen({
   const [editTitle, setEditTitle] = useState("");
   const [editNumCups, setEditNumCups] = useState(1);
   const [editNotes, setEditNotes] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -99,7 +100,7 @@ export function HomeScreen({
     if (sessionToEdit) {
       onUpdateSession(sessionToEdit.id, {
         title: editTitle,
-        numCups: editNumCups,
+        numCups: sessionToEdit.numCups, // Keep original numCups
         sessionNotes: editNotes,
       });
       setEditSheetOpen(false);
@@ -166,33 +167,43 @@ export function HomeScreen({
                         Resume
                       </Button>
                     )}
-                    <DropdownMenu>
+                    <DropdownMenu
+                      open={dropdownOpen === session.id}
+                      onOpenChange={(open: boolean) => {
+                        setDropdownOpen(open ? session.id : null);
+                      }}
+                    >
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-10 w-10 rounded-lg"
+                          aria-label="Session options"
                         >
                           <MoreVertical className="h-5 w-5" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuContent 
+                        align="end"
+                        side="bottom"
+                        className="w-48"
+                        sideOffset={5}
+                      >
                         <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
+                          onSelect={() => {
+                            setDropdownOpen(null);
                             handleEditClick(session);
                           }}
-                          className="cursor-pointer"
                         >
                           <Pencil className="h-4 w-4 mr-2" />
                           Edit Session
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
+                          onSelect={() => {
+                            setDropdownOpen(null);
                             handleDeleteClick(session);
                           }}
-                          className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                          className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete Session
@@ -252,21 +263,13 @@ export function HomeScreen({
               <Input
                 id="edit-cups"
                 type="number"
-                min="1"
-                max="30"
                 value={editNumCups}
-                onChange={(e) =>
-                  setEditNumCups(Math.max(1, Math.min(30, Number(e.target.value))))
-                }
-                className="h-12 rounded-xl"
-                inputMode="numeric"
+                className="h-12 rounded-xl bg-gray-100 dark:bg-gray-800"
+                readOnly
+                disabled
               />
               <p className="text-sm text-[#666] dark:text-[#aaa]">
-                {editNumCups > (sessionToEdit?.numCups || 0)
-                  ? `Adding ${editNumCups - (sessionToEdit?.numCups || 0)} new cups with default scores`
-                  : editNumCups < (sessionToEdit?.numCups || 0)
-                  ? `Warning: Removing ${(sessionToEdit?.numCups || 0) - editNumCups} cups will delete their scores`
-                  : "Cup count unchanged"}
+                Cup count cannot be changed after session creation
               </p>
             </div>
 
