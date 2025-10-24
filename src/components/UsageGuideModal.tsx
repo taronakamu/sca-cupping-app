@@ -16,7 +16,7 @@ export function UsageGuideModal({ open, onClose }: UsageGuideModalProps) {
   useEffect(() => {
     const loadMarkdown = async () => {
       try {
-        const response = await fetch("/USAGE_GUIDE.md");
+        const response = await fetch(`${import.meta.env.BASE_URL}USAGE_GUIDE.md`);
         const markdown = await response.text();
         
         // Configure marked options
