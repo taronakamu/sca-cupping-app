@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowLeft, StickyNote, ChevronRight, X } from "lucide-react";
+import { useSwipeable } from "react-swipeable";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -60,6 +61,27 @@ export function CuppingScreen({
   const [notesOpen, setNotesOpen] = useState(false);
 
   const currentCup = cupScores[activeCup];
+
+  // Swipe handler
+  const handleSwipe = (direction: 'Left' | 'Right') => {
+    if (direction === 'Left' && activeCup < numCups - 1) {
+      // Swipe left → next cup
+      setActiveCup(activeCup + 1);
+    } else if (direction === 'Right' && activeCup > 0) {
+      // Swipe right → previous cup
+      setActiveCup(activeCup - 1);
+    }
+  };
+
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => handleSwipe('Left'),
+    onSwipedRight: () => handleSwipe('Right'),
+    preventScrollOnSwipe: false,
+    trackMouse: false, // Disable mouse drag
+    delta: 120, // Minimum swipe distance of 120px to prevent accidental triggers
+    swipeDuration: 300, // Only recognize quick swipes (within 300ms)
+    touchEventOptions: { passive: true }, // Improve scroll performance
+  });
 
   const updateScore = <K extends keyof CupScore>(key: K, value: CupScore[K]) => {
     onUpdateCup(activeCup, { ...currentCup, [key]: value });
@@ -147,7 +169,7 @@ export function CuppingScreen({
               <TabsTrigger
                 key={i}
                 value={i.toString()}
-                className="flex-shrink-0 px-6 min-h-[44px] data-[state=active]:border-b-2 data-[state=active]:border-[#1a1a1a] dark:data-[state=active]:border-[#f5f5f5] rounded-none"
+                className="shrink-0 px-6 min-h-[44px] data-[state=active]:border-b-2 data-[state=active]:border-[#1a1a1a] dark:data-[state=active]:border-[#f5f5f5] rounded-none"
               >
                 #{i + 1}
               </TabsTrigger>
@@ -158,7 +180,7 @@ export function CuppingScreen({
         {/* Content - Following Sensory Evaluation Flow */}
         {Array.from({ length: numCups }, (_, i) => (
           <TabsContent key={i} value={i.toString()} className="p-4 pb-24">
-            <div className="max-w-2xl mx-auto space-y-6">
+            <div className="max-w-2xl mx-auto space-y-6" {...swipeHandlers}>
               {/* Cup Title & Roast Level */}
               <Card className="p-5 rounded-xl space-y-5">
                 <div>
