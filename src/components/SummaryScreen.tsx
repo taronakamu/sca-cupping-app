@@ -10,7 +10,7 @@ import {
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,

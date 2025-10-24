@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Plus, Coffee, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Plus, Coffee, MoreVertical, Pencil, Trash2, Upload } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +29,31 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
+interface CupScore {
+  cupTitle: string;
+  roastLevel: number;
+  fragrance: number;
+  aromaDryIntensity: number;
+  aromaBreakIntensity: number;
+  aromaQualities: string;
+  flavor: number;
+  flavorNotes: string;
+  aftertaste: number;
+  aftertasteNotes: string;
+  acidity: number;
+  acidityIntensity: number;
+  body: number;
+  bodyLevel: number;
+  balance: number;
+  uniformityIssues: boolean[];
+  cleanCupIssues: boolean[];
+  sweetnessIssues: boolean[];
+  overall: number;
+  taintCups: number;
+  faultCups: number;
+  notes: string;
+}
+
 interface Session {
   id: string;
   title: string;
@@ -35,6 +61,7 @@ interface Session {
   isComplete: boolean;
   numCups: number;
   sessionNotes: string;
+  cupScores: CupScore[];
 }
 
 interface HomeScreenProps {
@@ -47,6 +74,7 @@ interface HomeScreenProps {
     id: string,
     updates: { title: string; numCups: number; sessionNotes: string }
   ) => void;
+  onImportSession: (session: Session) => void;
 }
 
 export function HomeScreen({
@@ -56,6 +84,7 @@ export function HomeScreen({
   onViewSummary,
   onDeleteSession,
   onUpdateSession,
+  onImportSession,
 }: HomeScreenProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
@@ -65,6 +94,7 @@ export function HomeScreen({
   const [editNumCups, setEditNumCups] = useState(1);
   const [editNotes, setEditNotes] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -108,6 +138,47 @@ export function HomeScreen({
     }
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const importedData = JSON.parse(content);
+
+        // Validate the imported data structure
+        if (!importedData.id || !importedData.cupScores || !Array.isArray(importedData.cupScores)) {
+          toast.error("Invalid JSON format. Please select a valid cupping session file.");
+          return;
+        }
+
+        // Create a new session with a new ID and current timestamp
+        const newSession: Session = {
+          ...importedData,
+          id: Date.now().toString(), // Generate new ID to avoid conflicts
+          date: new Date().toISOString(), // Use current date
+          isComplete: importedData.isComplete ?? false,
+        };
+
+        onImportSession(newSession);
+        toast.success(`Successfully imported "${newSession.title || 'Untitled Session'}"`);
+      } catch (error) {
+        console.error("Failed to import session:", error);
+        toast.error("Failed to import file. Please check the file format.");
+      }
+    };
+
+    reader.readAsText(file);
+    // Reset the input so the same file can be imported again if needed
+    event.target.value = "";
+  };
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#121212] p-4 pb-20">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -124,6 +195,23 @@ export function HomeScreen({
         >
           <Plus className="h-5 w-5 mr-2" />
           New Cupping Session
+        </Button>
+
+        {/* Import Button */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
+        <Button
+          onClick={handleImportClick}
+          variant="outline"
+          className="w-full h-14 rounded-xl min-h-[56px]"
+        >
+          <Upload className="h-5 w-5 mr-2" />
+          Import Session from JSON
         </Button>
 
         {/* Sessions List */}

@@ -269,6 +269,40 @@ function App() {
     );
   };
 
+  const handleImportSession = (importedSession: Session) => {
+    // Ensure all required fields exist with defaults
+    const sessionWithDefaults: Session = {
+      ...importedSession,
+      cupScores: importedSession.cupScores.map((cup: any) => ({
+        cupTitle: cup.cupTitle || "",
+        roastLevel: cup.roastLevel ?? 3,
+        fragrance: cup.fragrance ?? 6.0,
+        aromaDryIntensity: cup.aromaDryIntensity ?? 3,
+        aromaBreakIntensity: cup.aromaBreakIntensity ?? 3,
+        aromaQualities: cup.aromaQualities || "",
+        flavor: cup.flavor ?? 6.0,
+        flavorNotes: cup.flavorNotes || "",
+        aftertaste: cup.aftertaste ?? 6.0,
+        aftertasteNotes: cup.aftertasteNotes || "",
+        acidity: cup.acidity ?? 6.0,
+        acidityIntensity: cup.acidityIntensity ?? 3,
+        body: cup.body ?? 6.0,
+        bodyLevel: cup.bodyLevel ?? 3,
+        balance: cup.balance ?? 6.0,
+        uniformityIssues: cup.uniformityIssues || [false, false, false, false, false],
+        cleanCupIssues: cup.cleanCupIssues || [false, false, false, false, false],
+        sweetnessIssues: cup.sweetnessIssues || [false, false, false, false, false],
+        overall: cup.overall ?? 6.0,
+        taintCups: cup.taintCups ?? 0,
+        faultCups: cup.faultCups ?? 0,
+        notes: cup.notes || "",
+      })),
+    };
+
+    // Add imported session to the beginning of the list
+    setSessions((prev) => [sessionWithDefaults, ...prev]);
+  };
+
   const currentSession = sessions.find((s) => s.id === currentSessionId);
 
   return (
@@ -281,6 +315,7 @@ function App() {
           onViewSummary={handleViewSummary}
           onDeleteSession={handleDeleteSession}
           onUpdateSession={handleUpdateSession}
+          onImportSession={handleImportSession}
         />
       )}
 
