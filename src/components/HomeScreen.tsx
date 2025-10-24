@@ -1,6 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus, Coffee, MoreVertical, Pencil, Trash2, Upload } from "lucide-react";
 import { Button } from "./ui/button";
+import { UsageGuideModal } from "./UsageGuideModal";
+import { useFirstLaunch } from "../hooks/useFirstLaunch";
 import { Card } from "./ui/card";
 import { toast } from "sonner";
 import {
@@ -95,6 +97,21 @@ export function HomeScreen({
   const [editNotes, setEditNotes] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // First launch modal
+  const { isFirstLaunch, markAsLaunched } = useFirstLaunch();
+  const [showUsageGuide, setShowUsageGuide] = useState(false);
+
+  useEffect(() => {
+    if (isFirstLaunch) {
+      setShowUsageGuide(true);
+    }
+  }, [isFirstLaunch]);
+
+  const handleCloseUsageGuide = () => {
+    setShowUsageGuide(false);
+    markAsLaunched();
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -390,6 +407,12 @@ export function HomeScreen({
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Usage Guide Modal */}
+      <UsageGuideModal 
+        open={showUsageGuide} 
+        onClose={handleCloseUsageGuide}
+      />
     </div>
   );
 }
